@@ -28,13 +28,11 @@ Regras comuns (para que todos os grupos obtenham os mesmos números):
 - Empate (mesma distância): vence a que está antes na fila (chegou antes).
 """
 
-
 class Escalonador:
     nome = "?"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
         raise NotImplementedError
-
 
 class FCFS(Escalonador):
     """First-Come, First-Served: atende na ordem de chegada. FORNECIDO."""
@@ -54,7 +52,21 @@ class SSTF(Escalonador):
     nome = "SSTF"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (núcleo N2): implementar o SSTF")
+        indice = min(
+            range(len(fila)),
+            key=lambda i: abs(fila[i].cilindro - cabeca)
+        )
+
+        alvo = fila[indice].cilindro
+
+        if alvo > cabeca:
+            nova_direcao = +1
+        elif alvo < cabeca:
+            nova_direcao = -1
+        else:
+            nova_direcao = direcao
+
+        return indice, nova_direcao, []
 
 
 class SCAN(Escalonador):
@@ -67,8 +79,33 @@ class SCAN(Escalonador):
     nome = "SCAN"
 
     def escolher(self, fila, cabeca, direcao, agora, max_cilindro):
-        raise NotImplementedError("TODO (núcleo N2): implementar o SCAN")
+        candidatos = []
 
+        for i, req in enumerate(fila):
+            if direcao == +1 and req.cilindro >= cabeca:
+                candidatos.append(i)
+            elif direcao == -1 and req.cilindro <= cabeca:
+                candidatos.append(i)
+
+        if candidatos:
+            indice = min(candidatos, key=lambda i: abs(fila[i].cilindro - cabeca))
+            return indice, direcao, []
+
+        nova_direcao = -direcao
+
+        candidatos = []
+
+        for i, req in enumerate(fila):
+            if nova_direcao == +1 and req.cilindro >= cabeca:
+                candidatos.append(i)
+            elif nova_direcao == -1 and req.cilindro <= cabeca:
+                candidatos.append(i)
+
+        indice = min(candidatos, key=lambda i: abs(fila[i].cilindro - cabeca))
+
+        borda = max_cilindro if direcao == +1 else 0
+
+        return indice, nova_direcao, [borda]
 
 # ------------------------------------------------------------------ módulo M2
 class CSCAN(Escalonador):
@@ -123,7 +160,10 @@ def criar_escalonador(nome):
     try:
         return ESCALONADORES[nome]()
     except KeyError:
-        raise ValueError("escalonador desconhecido: %s (opções: %s)" % (nome, ", ".join(ESCALONADORES)))
+        raise ValueError(
+            "escalonador desconhecido: %s (opções: %s)"
+            % (nome, ", ".join(ESCALONADORES))
+        )
 
 
 # ------------------------------------------------------------------ utilitário
@@ -135,15 +175,26 @@ def percorrer(escalonador, cilindros, cabeca, direcao=+1, max_cilindro=199):
     """
     from simes.es.requisicao import Requisicao
     from simes import parametros as P
-    fila = [Requisicao(i, 0.0, "P1", "L", c * P.BLOCOS_POR_CILINDRO) for i, c in enumerate(cilindros)]
+
+    fila = [
+        Requisicao(i, 0.0, "P1", "L", c * P.BLOCOS_POR_CILINDRO)
+        for i, c in enumerate(cilindros)
+    ]
+
     ordem, total = [], 0
+
     while fila:
-        i, direcao, passar = escalonador.escolher(fila, cabeca, direcao, 0.0, max_cilindro)
+        i, direcao, passar = escalonador.escolher(
+            fila, cabeca, direcao, 0.0, max_cilindro
+        )
+
         for c in passar:
             total += abs(c - cabeca)
             cabeca = c
+
         r = fila.pop(i)
         total += abs(r.cilindro - cabeca)
         cabeca = r.cilindro
         ordem.append(r.cilindro)
+
     return ordem, total

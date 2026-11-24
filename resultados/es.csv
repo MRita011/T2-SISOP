@@ -1,0 +1,13 @@
+experimento,carga,escalonador,dispositivo,modo_cpu,cache,capacidade_cache,escrita,n_blocos_req,intervalo_medio_ms,requisicoes,deslocamento_total,tempo_total_ms,resposta_media_ms,resposta_p95_ms,espera_max_ms,vazao_req_s,cpu_es_pct,acerto_cache_pct,escritas_fisicas,perdidos_na_queda,extras
+X12,compilador+contigua,FCFS,hdd,interrupcao,nenhuma,,,,,5400,6900,11986.6500,4970.8641,9510.3560,10033.5900,450.5012,0.7659,,1109,,
+X12,compilador+contigua,FCFS,hdd,interrupcao,LRU,1024,write-back,,,5400,104,1951.5010,0.2259,0.0400,24.3300,2767.1008,0.3589,90.3985,0,,
+X12,compilador+contigua,SSTF,hdd,interrupcao,nenhuma,,,,,5400,10,9988.0000,5170.1309,9032.7210,9806.0910,540.6488,0.9191,,1109,,
+X12,compilador+contigua,SSTF,hdd,interrupcao,LRU,1024,write-back,,,5400,80,1951.5010,0.1518,0.0400,32.8760,2767.1008,0.3580,90.4218,0,,
+X12,compilador+contigua,SCAN,hdd,interrupcao,nenhuma,,,,,5400,10,9988.0000,5170.1309,9032.7210,9806.0910,540.6488,0.9191,,1109,,
+X12,compilador+contigua,SCAN,hdd,interrupcao,LRU,1024,write-back,,,5400,49996,1951.5010,0.9446,0.0400,63.8340,2767.1008,0.3598,90.3752,0,,
+X12,banco_dados+contigua,FCFS,hdd,interrupcao,nenhuma,,,,,3610,360570,19846.9600,6158.7547,11721.3590,12339.7500,181.8918,0.3092,,1196,,
+X12,banco_dados+contigua,FCFS,hdd,interrupcao,LRU,1024,write-back,,,3610,260926,14911.7360,2151.2855,7028.4870,7405.7890,242.0912,0.3380,4.9296,670,,
+X12,banco_dados+contigua,SSTF,hdd,interrupcao,nenhuma,,,,,3610,1518,15415.0840,4106.2417,9494.9250,10507.4270,234.1862,0.3981,,1196,,
+X12,banco_dados+contigua,SSTF,hdd,interrupcao,LRU,1024,write-back,,,3610,2697,12991.0380,1411.9203,5915.0710,8147.7390,277.8839,0.3883,4.8467,670,,
+X12,banco_dados+contigua,SCAN,hdd,interrupcao,nenhuma,,,,,3610,19996,15436.6880,4055.0737,10431.8940,13274.7690,233.8585,0.3976,,1196,,
+X12,banco_dados+contigua,SCAN,hdd,interrupcao,LRU,1024,write-back,,,3610,40249,13065.5490,1382.3897,5769.0160,8768.8150,276.2991,0.3853,5.0953,670,,

@@ -162,16 +162,61 @@ class SistemaArquivos:
         partes = self._dividir(caminho)
         atual = self.raiz
 
-        for nome in partes:
+        # cada item guarda:
+        # nome, se é o último componente original e qual link originou esse caminho
+        pendentes = [
+            (nome, indice == len(partes) - 1, None)
+            for indice, nome in enumerate(partes)
+        ]
+
+        links_seguidos = 0
+
+        while pendentes:
+            nome, componente_final, origem_link = pendentes.pop(0)
+
             if atual.tipo != "diretorio":
                 raise ErroSA("ENOTDIR", caminho)
 
             self._ler_diretorio(atual)
 
             if nome not in atual.entradas:
+                # se esse pedaço veio do alvo de um link,
+                # então encontrei um link pendente
+                if origem_link is not None:
+                    self.contadores["links_pendentes"] += 1
+
                 raise ErroSA("ENOENT", caminho)
 
-            atual = self.fcbs[atual.entradas[nome]]
+            encontrado = self.fcbs[atual.entradas[nome]]
+
+            if encontrado.tipo == "simbolico":
+
+                # quando pedirem para não seguir o último link,
+                # devolvo o próprio fcb do link
+                if not seguir_simbolico and componente_final:
+                    return encontrado
+
+                links_seguidos += 1
+
+                # evita ficar preso em uma sequência infinita de links
+                if links_seguidos > MAX_LINKS_SIMBOLICOS:
+                    raise ErroSA("ELOOP", caminho)
+
+                alvo = self._dividir(encontrado.alvo)
+
+                # os componentes do alvo ficam marcados com o id do link
+                novos = [
+                    (parte, False, encontrado.id)
+                    for parte in alvo
+                ]
+
+                pendentes = novos + pendentes
+
+                # como os caminhos simulados são absolutos,
+                # começo novamente pela raiz
+                atual = self.raiz
+            else:
+                atual = encontrado
 
         return atual
     
@@ -409,25 +454,163 @@ class SistemaArquivos:
 
     # ======================================================== TODO — módulo M4
     def link(self, processo, existente, novo):
-        """Hard link: lê os diretórios até `existente` (como resolver) e até o pai de `novo`;
-        cria a entrada; links += 1; grava o bloco do pai de `novo` (1 escrita).
-        Hard link para diretório: ErroSA('EPERM')."""
-        raise NotImplementedError("TODO (M4): link")
+        """Cria um hard link para um arquivo que já existe."""
+
+        # primeiro encontro o arquivo que vai receber outro nome
+        fcb = self.resolver(existente)
+
+        # hard link para diretório não é permitido
+        if fcb.tipo == "diretorio":
+            raise ErroSA("EPERM", existente)
+
+        # separo o caminho novo para encontrar o diretório pai
+        partes = self._dividir(novo)
+
+        # não dá para substituir a raiz por um link
+        if not partes:
+            raise ErroSA("EEXIST", novo)
+
+        nome = partes[-1]
+
+        # se o novo nome vai ficar direto na raiz,
+        # preciso ler a raiz porque ela é o diretório pai
+        if len(partes) == 1:
+            pai = self.raiz
+            self._ler_diretorio(pai)
+
+        else:
+            caminho_pai = "/" + "/".join(partes[:-1])
+            pai = self.resolver(caminho_pai)
+
+            # confere se o caminho realmente terminou em um diretório
+            if pai.tipo != "diretorio":
+                raise ErroSA("ENOTDIR", caminho_pai)
+
+            # lê o próprio diretório pai antes de mexer na entrada
+            self._ler_diretorio(pai)
+
+        # não posso criar outro nome se ele já existe nesse diretório
+        if nome in pai.entradas:
+            raise ErroSA("EEXIST", novo)
+
+        # os dois nomes vão apontar para o mesmo fcb
+        pai.entradas[nome] = fcb.id
+
+        # aumenta a quantidade de hard links desse arquivo
+        fcb.links += 1
+
+        # como alterei o conteúdo do diretório, preciso gravar ele
+        self._gravar_diretorio(pai)
+
+        return fcb
 
     def symlink(self, processo, alvo, caminho):
-        """Link simbólico: lê os diretórios até o pai de `caminho`; cria um FCB do tipo
-        'simbolico' com fcb.alvo = alvo (sem blocos de dados); grava o bloco do pai (1 escrita).
-        O alvo não precisa existir."""
-        raise NotImplementedError("TODO (M4): symlink")
+        """Cria um link simbólico apontando para outro caminho."""
+
+        # separo o caminho onde o link vai ser criado
+        partes = self._dividir(caminho)
+
+        # não dá para criar um link no lugar da raiz
+        if not partes:
+            raise ErroSA("EEXIST", caminho)
+
+        nome = partes[-1]
+
+        # se vai ser criado direto na raiz, ela é o diretório pai
+        if len(partes) == 1:
+            pai = self.raiz
+            self._ler_diretorio(pai)
+        else:
+            caminho_pai = "/" + "/".join(partes[:-1])
+            pai = self.resolver(caminho_pai)
+
+            # o pai precisa ser um diretório
+            if pai.tipo != "diretorio":
+                raise ErroSA("ENOTDIR", caminho_pai)
+
+            # preciso ler o diretório antes de alterar as entradas
+            self._ler_diretorio(pai)
+
+        # não posso criar se já existir alguma entrada com esse nome
+        if nome in pai.entradas:
+            raise ErroSA("EEXIST", caminho)
+
+        # o link simbólico tem seu próprio fcb
+        novo = self._novo_fcb(nome, "simbolico", pai.id, processo)
+
+        # guardo somente o caminho para onde ele aponta
+        novo.alvo = alvo
+
+        # adiciono o novo link dentro do diretório
+        pai.entradas[nome] = novo.id
+
+        # não tem bloco de dados para alocar,
+        # só preciso gravar a alteração feita no diretório pai
+        self._gravar_diretorio(pai)
+
+        return novo
 
     def percorrer(self, processo, caminho):
-        """Percorre a árvore a partir de `caminho` (como um `find`), lendo cada diretório
-        visitado (1 leitura) e seguindo links simbólicos para diretórios. Não pode entrar em
-        laço: ao chegar de novo a um diretório já visitado nesta travessia, conte
-        self.contadores['ciclos_detectados'] e não desça. Contem também
-        'percorrer_diretorios', 'percorrer_arquivos' e 'links_pendentes' (links simbólicos
-        cujo alvo não existe; contem também os encontrados pelo open)."""
-        raise NotImplementedError("TODO (M4): percorrer")
+        """Percorre a árvore e conta diretórios, arquivos, ciclos e links pendentes."""
+
+        # guarda os diretórios em que eu já entrei nessa travessia
+        visitados = set()
+
+        def visitar(fcb):
+
+            # se for um diretório, preciso verificar se já passei por ele
+            if fcb.tipo == "diretorio":
+
+                # se já visitei, achei um ciclo e não desço de novo
+                if fcb.id in visitados:
+                    self.contadores["ciclos_detectados"] += 1
+                    return
+
+                visitados.add(fcb.id)
+                self.contadores["percorrer_diretorios"] += 1
+
+                # cada diretório visitado custa uma leitura
+                self._ler_diretorio(fcb)
+
+                # percorro todas as entradas que existem dentro dele
+                for nome, fcb_id in list(fcb.entradas.items()):
+                    filho = self.fcbs[fcb_id]
+
+                    # diretório normal
+                    if filho.tipo == "diretorio":
+                        visitar(filho)
+
+                    # arquivo normal
+                    elif filho.tipo == "arquivo":
+                        self.contadores["percorrer_arquivos"] += 1
+
+                    # link simbólico precisa tentar resolver o alvo
+                    elif filho.tipo == "simbolico":
+                        antes = self.contadores["links_pendentes"]
+
+                        try:
+                            alvo = self.resolver(filho.alvo)
+
+                        except ErroSA:
+                            # se o resolver ainda não contou,
+                            # é porque o próprio alvo direto não existe
+                            if self.contadores["links_pendentes"] == antes:
+                                self.contadores["links_pendentes"] += 1
+
+                            continue
+
+                        # a regra pede para seguir links simbólicos para diretórios
+                        if alvo.tipo == "diretorio":
+                            visitar(alvo)
+
+            # se o próprio caminho inicial for um arquivo
+            elif fcb.tipo == "arquivo":
+                self.contadores["percorrer_arquivos"] += 1
+
+        # resolvo o ponto onde a travessia vai começar
+        inicio = self.resolver(caminho)
+
+        visitar(inicio)
 
     # ======================================================== TODO — módulo M5
     # Regras do M5 (implementem também os ganchos _verificar_permissao e _verificar_trava,

@@ -11,9 +11,34 @@ cache.
 Cada item do histórico é (instante_ms, processo, tipo, bloco, n_blocos).
 """
 
+from simes.es.requisicao import Requisicao
+
 
 def historico_para_requisicoes(historico):
-    """Converte o histórico da CamadaBloco numa lista de Requisicao (simes.es.requisicao),
-    em ordem de chegada, com ids 0, 1, 2, ... Acessos da mesma operação chegam no mesmo
-    instante."""
-    raise NotImplementedError("TODO (integração): converter o histórico em requisições")
+    """Converte o histórico da camada de blocos em requisições de E/S."""
+
+    requisicoes = []
+
+    # ordeno pelo instante de chegada
+    # se duas tiverem o mesmo instante, mantenho a ordem que já estava no histórico
+    historico_ordenado = sorted(
+        historico,
+        key=lambda item: item[0]
+    )
+
+    # cada acesso do histórico vira uma requisição de E/S
+    for id_requisicao, item in enumerate(historico_ordenado):
+        instante_ms, processo, tipo, bloco, n_blocos = item
+
+        requisicao = Requisicao(
+            id=id_requisicao,
+            chegada=instante_ms,
+            processo=processo,
+            tipo=tipo,
+            bloco=bloco,
+            n_blocos=n_blocos,
+        )
+
+        requisicoes.append(requisicao)
+
+    return requisicoes

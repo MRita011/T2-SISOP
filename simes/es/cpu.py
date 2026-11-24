@@ -34,6 +34,7 @@ def custo_cpu(modo, n_blocos, duracao_ms):
         return n_blocos * (P.CUSTO_INTERRUPCAO_MS + P.CUSTO_COPIA_MS_POR_BLOCO)
 
     if modo == "dma":
-        raise NotImplementedError("TODO (M3): custo do DMA")
+        # no dma a cpu só configura a transferencia e recebe uma interrupcao no final
+        return P.CUSTO_PROGRAMAR_DMA_MS + P.CUSTO_INTERRUPCAO_MS
 
     raise ValueError("modo desconhecido: %s" % modo)

@@ -444,6 +444,9 @@ class SistemaArquivos:
         fcb_id = pai.entradas[nome]
         fcb = self.fcbs[fcb_id]
 
+        if fcb.tipo == "diretorio":
+            raise ErroSA("EPERM", caminho)
+
         del pai.entradas[nome]
         fcb.links -= 1
 
@@ -591,10 +594,10 @@ class SistemaArquivos:
                         try:
                             alvo = self.resolver(filho.alvo)
 
-                        except ErroSA:
-                            # se o resolver ainda não contou,
-                            # é porque o próprio alvo direto não existe
-                            if self.contadores["links_pendentes"] == antes:
+                        except ErroSA as erro:
+                            # se o resolver ainda não contou e o alvo não existe,
+                            # contabiliza como link pendente (laços ELOOP não são alvo inexistente)
+                            if erro.codigo == "ENOENT" and self.contadores["links_pendentes"] == antes:
                                 self.contadores["links_pendentes"] += 1
 
                             continue

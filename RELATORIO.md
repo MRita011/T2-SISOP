@@ -354,3 +354,4 @@ No X12, o SimES representa de forma simplificada a relação entre sistema de ar
 | Ferramenta | Finalidade | Onde foi usada (arquivos ou seções) |
 |---|---|---|
 | Gemini | Apoio técnico na interpretação do enunciado, desenvolvimento e revisão. | `simes/integracao.py` e experimento X12. |
+| Claude | Apoio na redação e revisão da análise e das hipóteses. | seções X5 e X8 do `RELATORIO.md` |

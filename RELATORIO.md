@@ -4,24 +4,9 @@
 
 **Repositório:** https://github.com/MRita011/T2-SISOP
 
-<!--
-INSTRUÇÕES DO MODELO (apaguem este bloco antes de entregar)
-- Este relatório é a entrega: exportem-no para PDF e CADA integrante envia o PDF no Moodle.
-- Nomes completos de todos os integrantes e o link do repositório público são obrigatórios
-  (linhas acima). Não coloquem matrícula, e-mail, telefone ou outro dado pessoal.
-- Mantenham EXATAMENTE os títulos numerados (## 0. ... ## 8.) e os campos em negrito.
-- Na seção 3, mantenham X1 a X5 e só as seções dos experimentos do escopo do grupo
-  (M1 = X6, M2 = X7, M3 = X8, M4 = X9, M5 = X10, M6 = X11, integração = X12, bônus = X13).
-  Apaguem as seções dos experimentos que o grupo não fez.
-- Substituam todo texto entre colchetes [ ... ] pelo conteúdo do grupo.
-- O campo **Veredito:** aceita só: CONFIRMADA, PARCIALMENTE CONFIRMADA ou REFUTADA.
-- Em **Evidências:**, citem arquivos que existam no repositório (resultados/..., graficos/...).
-- Antes de entregar, rodem:  python3 ferramentas/validar_entrega.py
--->
-
 ## 0. Resumo
 
-[Até 10 linhas: o que o grupo implementou, quais módulos escolheu e os 3 resultados mais importantes.]
+O trabalho implementou e avaliou o subsistema de E/S e o sistema de arquivos do SimES, incluindo SSTF, SCAN, polling, interrupção e as operações do sistema de arquivos. Foram desenvolvidos também os módulos M1 (cache de blocos), M3 (DMA e buffering) e M4 (links e compartilhamento), além da integração ponta a ponta obrigatória. Os experimentos mostraram que o desempenho das políticas depende fortemente do padrão de acesso e da carga. No X12, a cache LRU alcançou cerca de 90,4% de acertos na carga `compilador`, mas apenas cerca de 5% em `banco_dados`. No X8, o DMA manteve baixo e praticamente constante o custo de CPU conforme o tamanho das requisições aumentou. Os resultados também mostraram diferenças importantes entre FCFS, SSTF e SCAN e entre as políticas de cache e escrita.
 
 ## 1. Escopo realizado
 
@@ -30,12 +15,12 @@ INSTRUÇÕES DO MODELO (apaguem este bloco antes de entregar)
 | N1 · Dispositivo (fornecido) | usado | — |
 | N2 · Subsistema de E/S (SSTF, SCAN, polling, interrupção) | completo | Implementação concluída e testes aprovados. |
 | N3 · Sistema de arquivos | completo | Implementação concluída e testes aprovados. |
-| N4 · Experimentos X1–X5 e relatório | [completo / parcial] | [ ] |
+| N4 · Experimentos X1–X5 e relatório | completo | Experimentos executados, analisados e documentados no relatório. |
 | M1 · Cache de blocos | completo | Implementação concluída e testes aprovados. |
 | M3 · DMA e buffering | completo | Implementação concluída e testes aprovados. |
 | M4 · Links e compartilhamento | completo | Implementação concluída e testes aprovados. |
 | Integração (grupos de 4) | completo | Implementação concluída, teste aprovado e experimento X12 executado, analisado e com evidências geradas. |
-| [Bônus flash] | [completo / parcial / não feito] | [ ] |
+| Bônus flash | não feito | — |
 
 Resultado dos testes automáticos (`python3 executar.py testes`): Ran 29 tests in 0.035s — OK (skipped=4)
 
@@ -101,35 +86,67 @@ Os quatro testes ignorados correspondem a M2, M5 e M6, que não fazem parte dos 
 
 ### X1 — Escalonadores sob quatro padrões de carga
 
-**Hipótese:** [escrita ANTES de rodar o experimento]
+**Hipótese:** esperávamos que SSTF e SCAN reduzissem o deslocamento do braço e o tempo de resposta médio em relação ao FCFS nas quatro cargas, com o maior ganho nas cargas em que o FCFS faz o braço "pular" pelo disco (aleatória e rajadas). Também esperávamos que o SSTF tivesse o menor tempo médio, mas a maior espera máxima, porque pode adiar pedidos distantes (inanição), e que o SCAN ficasse entre os dois, com espera mais uniforme.
 
-**Fundamentação:** [por que esperavam isso; citem as seções do Silberschatz]
+**Fundamentação:** o tempo de atendimento de um HDD é dominado pela busca e pela latência rotacional, não pela transferência (Silberschatz, Galvin e Gagne, 2013, seção 10.1.1). O FCFS é justo, mas não considera a posição do braço; o SSTF escolhe sempre o pedido mais próximo, o que minimiza a busca local, mas pode causar inanição; o SCAN varre o disco de uma ponta à outra e atende os pedidos no caminho, o que limita a espera de cada pedido (seções 10.4.1, 10.4.2 e 10.4.3). Na escolha do algoritmo, o livro também observa que o desempenho depende do número e do tipo das requisições (seção 10.4.6).
 
-**Configuração:** [o que o experimento varia e o que mede]
+**Configuração:** o experimento varia o escalonador (FCFS, SSTF e SCAN) e a carga (`sequencial`, `aleatoria`, `concentrada` e `rajadas`, 2.000 requisições cada), com HDD e conclusão por interrupção, totalizando 12 execuções. Mede deslocamento total do braço (em cilindros), tempo de resposta médio e P95, espera máxima e vazão. Na carga `sequencial`, dois processos leem arquivos grandes em regiões distantes do disco (blocos 20.000 e 250.000); na `concentrada`, 80% dos pedidos caem numa faixa "quente" de 20% do disco; na `rajadas`, chegam 50 pedidos de uma vez a cada 600 ms.
 
-**Resultados:** [tabela com os números principais e referência aos gráficos]
+**Resultados:**
 
-**Evidências:** [resultados/es.csv (experimento=X1); graficos/X1_resposta_media_ms.png]
+| Carga | Escalonador | Deslocamento total | Resposta média (ms) | P95 (ms) | Espera máx. (ms) | Vazão (req/s) |
+|---|---|---:|---:|---:|---:|---:|
+| sequencial | FCFS | 7.184.093 | 10241,05 | 19565,45 | 20598,06 | 61,5 |
+| sequencial | SSTF | 2.336.365 | 17,39 | 32,79 | 37,44 | 167,5 |
+| sequencial | SCAN | 2.469.069 | 23,21 | 43,65 | 48,59 | 167,4 |
+| aleatoria | FCFS | 3.316.472 | 50,10 | 145,09 | 193,52 | 82,5 |
+| aleatoria | SSTF | 2.631.714 | 20,99 | 48,61 | 116,65 | 82,5 |
+| aleatoria | SCAN | 3.372.680 | 31,53 | 65,06 | 116,73 | 82,4 |
+| concentrada | FCFS | 1.864.164 | 19,80 | 48,57 | 96,02 | 83,8 |
+| concentrada | SSTF | 1.613.030 | 15,02 | 37,20 | 130,52 | 83,8 |
+| concentrada | SCAN | 3.338.708 | 33,20 | 68,33 | 118,75 | 83,7 |
+| rajadas | FCFS | 3.341.490 | 266,97 | 505,32 | 597,29 | 83,5 |
+| rajadas | SSTF | 209.811 | 147,49 | 277,72 | 296,99 | 84,4 |
+| rajadas | SCAN | 199.955 | 148,62 | 278,70 | 285,44 | 84,4 |
 
-**Análise:** [explicação dos resultados, inclusive o que contrariou a hipótese]
+O gráfico `graficos/X1_resposta_media_ms.png` (escala logarítmica) mostra o tempo de resposta médio; `graficos/X1_deslocamento_total.png` e `graficos/X1_espera_max_ms.png` mostram o deslocamento e a espera máxima.
 
-**Veredito:** [CONFIRMADA | PARCIALMENTE CONFIRMADA | REFUTADA]
+**Evidências:** `resultados/es.csv` (experimento=X1); `graficos/X1_resposta_media_ms.png`; `graficos/X1_deslocamento_total.png`; `graficos/X1_espera_max_ms.png`.
+
+**Análise:** o SSTF teve o menor tempo de resposta médio nas quatro cargas, como esperado. O caso mais extremo foi a carga `sequencial`: no FCFS, o braço alterna entre as regiões dos dois processos a cada pedido, então cada requisição paga uma busca longa e a latência rotacional, e o disco deixa de aproveitar a leitura em sequência. Com isso, a vazão do FCFS (61,5 req/s) ficou abaixo da taxa de chegada, a fila cresceu durante toda a execução e a resposta média passou de 10 s. SSTF e SCAN atendem em sequência os pedidos de uma mesma região, cortam o deslocamento em cerca de dois terços e mantêm a fila estável (vazão de 167 req/s), o que reduz a resposta média em mais de 99%. Nas `rajadas`, como 50 pedidos chegam juntos, os dois algoritmos conseguem ordenar a rajada inteira e reduzem o deslocamento em cerca de 94% e a resposta média em cerca de 45%.
+
+Dois resultados contrariaram a hipótese. Primeiro, o SCAN foi pior que o FCFS na carga `concentrada` (33,2 ms contra 19,8 ms) e teve o maior deslocamento (3,34 milhões de cilindros, quase o dobro do FCFS). Como o SCAN do modelo vai até a ponta do disco antes de inverter, ele atravessa várias vezes a região "fria", onde há poucos pedidos, enquanto os pedidos da faixa quente esperam; na `aleatoria`, pelo mesmo motivo, o deslocamento do SCAN ficou um pouco acima do FCFS, embora a resposta média tenha caído. Isso indica que um LOOK, que inverte no último pedido, seria mais adequado para essa carga. Segundo, a inanição do SSTF apareceu na `concentrada`: a resposta média foi a menor, mas a espera máxima (130,5 ms) foi a maior entre os três, porque os pedidos fora da faixa quente ficam sendo adiados enquanto chegam pedidos mais próximos. Nas cargas `aleatoria` e `rajadas`, SSTF e SCAN tiveram espera máxima praticamente igual, então a vantagem de justiça do SCAN só apareceu na carga concentrada. Por fim, a vazão só mudou de forma relevante quando o FCFS saturou o disco (carga `sequencial`); nas outras cargas o disco não ficou saturado, e a vazão foi determinada pela taxa de chegada.
+
+**Veredito:** PARCIALMENTE CONFIRMADA
 
 ### X2 — Polling × interrupção conforme o dispositivo
 
-**Hipótese:** [ ]
+**Hipótese:** esperávamos que, no HDD, o polling gastasse muito mais CPU que a interrupção, porque a CPU fica em espera ocupada durante toda a busca e a rotação, que levam milissegundos. Já no dispositivo rápido, esperávamos que a diferença diminuísse ou até se invertesse, porque a requisição termina em poucos microssegundos e o custo fixo de tratar uma interrupção por bloco passa a pesar mais que a espera. Também esperávamos que o modo de conclusão não mudasse o tempo de resposta, que depende só do dispositivo e da fila.
 
-**Fundamentação:** [ ]
+**Fundamentação:** no polling, a CPU testa repetidamente o registrador de estado da controladora até a operação terminar, o que é eficiente só quando o dispositivo responde rápido; com interrupções, a CPU fica livre para outro trabalho e só é chamada quando a controladora sinaliza o fim, mas cada interrupção tem o custo de salvar o estado e trocar de contexto (Silberschatz, Galvin e Gagne, 2013, seções 13.2.1 e 13.2.2). O livro observa que o polling é eficiente quando o dispositivo fica pronto logo e se torna desperdício quando a CPU testa o estado muitas vezes sem encontrá-lo pronto, que é o caso de um dispositivo lento.
 
-**Configuração:** [ ]
+**Configuração:** o experimento usa o escalonador FCFS e varia o dispositivo (HDD e dispositivo rápido, sem busca nem rotação e com 0,008 ms por bloco), a carga (`aleatoria`, com 1 bloco por pedido, e `sequencial`, com 8 blocos por pedido) e o modo de conclusão (polling e interrupção), totalizando 8 execuções. No modelo, o polling custa à CPU o tempo inteiro de atendimento, e a interrupção custa 0,017 ms por bloco (0,015 ms da interrupção mais 0,002 ms da cópia). Mede a porcentagem de CPU gasta com E/S e o tempo de resposta médio.
 
-**Resultados:** [ ]
+**Resultados:**
 
-**Evidências:** [ ]
+| Dispositivo | Carga | Modo | CPU com E/S (%) | Resposta média (ms) |
+|---|---|---|---:|---:|
+| hdd | aleatoria | polling | 86,28 | 50,10 |
+| hdd | aleatoria | interrupcao | 1,12 | 50,10 |
+| hdd | sequencial | polling | 100,00 | 10241,05 |
+| hdd | sequencial | interrupcao | 0,84 | 10241,05 |
+| rapido | aleatoria | polling | 0,53 | 0,064 |
+| rapido | aleatoria | interrupcao | 1,12 | 0,064 |
+| rapido | sequencial | polling | 1,07 | 0,064 |
+| rapido | sequencial | interrupcao | 2,28 | 0,064 |
 
-**Análise:** [ ]
+O gráfico `graficos/X2_cpu.png` compara a CPU gasta com E/S em cada combinação.
 
-**Veredito:** [ ]
+**Evidências:** `resultados/es.csv` (experimento=X2); `graficos/X2_cpu.png`.
+
+**Análise:** no HDD, o polling ocupou de 86% a 100% da CPU, contra cerca de 1% com interrupção: a CPU fica presa esperando a busca e a rotação, que levam vários milissegundos por pedido. Na carga `sequencial`, o FCFS com HDD mantém o disco ocupado o tempo todo (como visto no X1), então o polling chega a consumir praticamente 100% da CPU. No dispositivo rápido, a relação se inverteu: o polling gastou cerca de metade da CPU da interrupção (0,53% contra 1,12% na `aleatoria` e 1,07% contra 2,28% na `sequencial`). Isso acontece porque um bloco é transferido em 0,008 ms, menos que os 0,017 ms que a CPU gasta para tratar a interrupção e copiar o bloco; com 8 blocos, são 0,064 ms de polling contra 0,136 ms de interrupção, a mesma proporção de cerca de 2,1 vezes vista nos resultados. Em todos os pares, o tempo de resposta foi idêntico, o que confirma que o modo de conclusão só muda quem paga a espera (a CPU ou não), e não quanto tempo o dispositivo leva. A conclusão é que a escolha entre polling e interrupção depende da relação entre o tempo de atendimento do dispositivo e o custo de uma interrupção, e por isso sistemas reais com SSDs NVMe muito rápidos voltam a usar polling em alguns casos.
+
+**Veredito:** CONFIRMADA
 
 ### X3 — Acesso sequencial × direto
 
@@ -242,19 +259,45 @@ Limitações: o X5 roda sem cache de blocos, então todo `open` relê `/` e `/ww
 
 ### X6 — Cache de blocos (M1)
 
-**Hipótese:** [ ]
+**Hipótese:** esperávamos que a taxa de acerto crescesse com a capacidade da cache, com retorno cada vez menor até se estabilizar quando o conjunto de blocos reutilizados coubesse inteiro na cache. Também esperávamos que o LRU tivesse taxa de acerto maior que o FIFO nas capacidades pequenas, porque a carga `reuso` tem poucos blocos muito acessados, e que a diferença sumisse nas capacidades grandes. Sobre a escrita, esperávamos que o write-back fizesse menos escritas físicas e tivesse resposta menor que o write-through, mas perdesse blocos modificados na queda de energia, enquanto o write-through não perderia nenhum.
 
-**Fundamentação:** [ ]
+**Fundamentação:** a cache de blocos (buffer cache) mantém na memória blocos lidos recentemente para evitar acessos ao disco (Silberschatz, Galvin e Gagne, 2013, seção 12.6.2). Na escolha do bloco a ser substituído, o LRU aproxima o algoritmo ótimo ao descartar o bloco usado há mais tempo, enquanto o FIFO descarta o mais antigo na cache, mesmo que ele seja muito usado (seções 9.4.2 e 9.4.4, sobre substituição de páginas, que valem também para blocos). Na escrita síncrona (write-through), cada escrita vai ao disco na hora; na assíncrona (write-back), o bloco fica sujo na memória e é gravado depois, o que é mais rápido, mas deixa o sistema de arquivos sujeito a perder dados numa queda (seções 12.6.2 e 12.7).
 
-**Configuração:** [ ]
+**Configuração:** o experimento usa a carga `reuso` (3.000 requisições, 65% leituras, acessos com distribuição de Zipf sobre 4.000 blocos), FCFS, HDD e interrupção. Varia a política de substituição (LRU e FIFO), a capacidade (64, 128, 256, 512, 1.024 e 2.048 blocos) e a política de escrita (write-through e write-back), totalizando 24 execuções com cache e 1 sem cache como referência. Em todas há uma queda de energia simulada no instante da requisição do meio da carga, e os blocos sujos são gravados a cada 5.000 ms no write-back. Mede taxa de acerto, escritas físicas, blocos perdidos na queda, tempo de resposta médio e espera máxima.
 
-**Resultados:** [ ]
+**Resultados:**
 
-**Evidências:** [ ]
+Sem cache: resposta média de 3499,95 ms, espera máxima de 6936,25 ms e 1.045 escritas físicas.
 
-**Análise:** [ ]
+| Capacidade | Acerto LRU (%) | Acerto FIFO (%) | Resposta LRU WT (ms) | Resposta FIFO WT (ms) |
+|---:|---:|---:|---:|---:|
+| 64 | 39,64 | 31,30 | 74,66 | 436,11 |
+| 128 | 48,85 | 42,56 | 33,37 | 51,73 |
+| 256 | 57,75 | 53,20 | 22,05 | 25,86 |
+| 512 | 64,19 | 60,56 | 18,17 | 20,54 |
+| 1024 | 67,06 | 67,06 | 16,89 | 16,89 |
+| 2048 | 67,06 | 67,06 | 16,89 | 16,89 |
 
-**Veredito:** [ ]
+(Acerto medido com write-through; com write-back a taxa varia no máximo 1,8 ponto percentual.)
+
+| Capacidade (LRU) | Escritas físicas WT | Escritas físicas WB | Perdidos na queda WT | Perdidos na queda WB | Resposta WT (ms) | Resposta WB (ms) | Espera máx. WT (ms) | Espera máx. WB (ms) |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 64 | 1045 | 715 | 0 | 28 | 74,66 | 23,36 | 257,81 | 418,41 |
+| 128 | 1045 | 630 | 0 | 51 | 33,37 | 26,24 | 157,95 | 690,24 |
+| 256 | 1045 | 543 | 0 | 55 | 22,05 | 47,63 | 151,79 | 1271,08 |
+| 512 | 1045 | 541 | 0 | 55 | 18,17 | 45,41 | 151,79 | 1416,81 |
+| 1024 | 1045 | 541 | 0 | 55 | 16,89 | 38,93 | 151,79 | 1416,81 |
+| 2048 | 1045 | 541 | 0 | 55 | 16,89 | 38,93 | 151,79 | 1416,81 |
+
+Os gráficos `graficos/X6_acerto.png` (acerto × capacidade) e `graficos/X6_escrita.png` (escritas físicas e perdas, LRU) resumem as duas tabelas.
+
+**Evidências:** `resultados/es.csv` (experimento=X6); `graficos/X6_acerto.png`; `graficos/X6_escrita.png`.
+
+**Análise:** qualquer cache melhorou muito o sistema: sem cache, o disco fica saturado com a carga `reuso` e a resposta média é de 3,5 s; com só 64 blocos de LRU ela cai para 75 ms. A taxa de acerto cresceu com a capacidade com retorno decrescente (de 39,6% para 48,8% ao dobrar de 64 para 128, e só de 64,2% para 67,1% de 512 para 1.024) e ficou estável a partir de 1.024 blocos. Nesse ponto todos os blocos reutilizados já cabem na cache, e os cerca de 33% restantes são faltas compulsórias (primeiro acesso a cada bloco), que nenhuma política consegue evitar. O LRU teve acerto maior que o FIFO em todas as capacidades abaixo de 1.024, com a maior vantagem em 64 blocos (8,3 pontos), e a diferença na resposta foi ainda maior (75 ms contra 436 ms), porque cada falta extra no FIFO volta a ocupar o HDD. A partir de 1.024 as duas políticas dão o mesmo resultado, já que nenhuma substituição precisa acontecer.
+
+O write-back fez o que se esperava em escritas e perdas: reduziu as escritas físicas em até 48% (de 1.045 para 541), porque várias escritas no mesmo bloco viram uma só gravação, mas perdeu até 55 blocos modificados na queda de energia, enquanto o write-through não perdeu nenhum. O resultado que contrariou a hipótese foi o tempo de resposta: o write-back só foi mais rápido nas capacidades pequenas (64 e 128); a partir de 256 blocos ele foi mais de duas vezes mais lento que o write-through (38,9 ms contra 16,9 ms em 1.024) e teve espera máxima quase 10 vezes maior (1416,8 ms contra 151,8 ms). Isso acontece porque, com cache grande, os blocos sujos se acumulam e a gravação periódica a cada 5 s envia centenas de escritas de uma vez ao disco, o que forma uma fila momentânea que atrasa as leituras que chegam logo depois. Assim, o write-back troca menos escritas no total por picos de latência e risco de perda de dados, e o write-through é mais previsível nesta carga.
+
+**Veredito:** PARCIALMENTE CONFIRMADA
 
 ### X8 — DMA e buffering
 
@@ -440,6 +483,7 @@ No X12, o SimES representa de forma simplificada a relação entre sistema de ar
 Maria Rita Rodrigues: atuou no N2, com a implementação de SSTF, SCAN, polling e interrupção, e no N3, envolvendo resolução de caminhos, tabelas de arquivos abertos e operações de leitura, escrita, seek, close e unlink. Também trabalhou nos módulos M1, com cache LRU/FIFO e políticas write-through e write-back; M3, com DMA e buffering; e M4, com hard links, links simbólicos, links pendentes e detecção de ciclos. Por fim, ficou responsável pela integração ponta a ponta em `simes/integracao.py`, pela execução e análise do experimento X12 e pela discussão dos resultados e das limitações observadas.
 - Jully Anne Seyffert da Silva Jara: revisão/validação do Núcleo N3 (`SistemaArquivos`) e Módulo M4 (links rígidos, links simbólicos e travessia `percorrer`), testes complementares (`testes/test_n3_m4.py`) e elaboração das hipóteses, fundamentação, tabelas de resultados, evidências e análises dos experimentos X3, X4 e X9, além dos tópicos de sistema de arquivos e links nas seções 2, 4, 5, 6 e 7.
 - Mayra Bordin de Abreu: responsável pela elaboração, execução e análise dos experimentos X5 e X8, incluindo tabelas de arquivos abertos com vários processos, DMA e buffering, organização dos resultados e evidências, geração dos gráficos correspondentes e redação das hipóteses, fundamentação, resultados, análises, limitações e vereditos dessas seções.
+- Gabriel Ribeiro Kowaleski: responsável pela parte de núcleo de E/S e cache de blocos nos experimentos. Executou e analisou os experimentos X1 (escalonadores FCFS, SSTF e SCAN), X2 (polling × interrupção) e X6 (cache LRU × FIFO, capacidade, write-through × write-back e queda de energia), escrevendo hipótese, fundamentação, configuração, resultados, evidências e análise dessas seções, e gerou os arquivos de `resultados/` e `graficos/` correspondentes.
 
 **Uso de ferramentas de IA:**
 
@@ -447,4 +491,5 @@ Maria Rita Rodrigues: atuou no N2, com a implementação de SSTF, SCAN, polling 
 |---|---|---|
 | Google Antigravity (Gemini) | Revisão de conformidade das regras de custo e tratamento de erros em `percorrer`/`unlink`, criação de testes unitários complementares e apoio na estruturação teórica do relatório para N3, M4, X3, X4 e X9 | `simes/arquivos/sistema.py` (ajuste em `percorrer` e `unlink`), `testes/test_n3_m4.py` e `RELATORIO.md` (seções N3, M4, X3, X4, X9 e tópicos de arquivos nas seções 4–7) |
 | Gemini | Apoio técnico na interpretação do enunciado, desenvolvimento e revisão. | `simes/integracao.py` e experimento X12. |
+| Claude (Anthropic) | Apoio na execução dos experimentos, organização das tabelas e redação e revisão da análise; os números foram conferidos com `resultados/es.csv`. | Experimentos X1, X2 e X6. |
 | Claude | Apoio na redação e revisão da análise e das hipóteses. | seções X5 e X8 do `RELATORIO.md` |

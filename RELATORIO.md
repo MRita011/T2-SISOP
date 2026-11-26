@@ -4,24 +4,9 @@
 
 **Repositório:** https://github.com/MRita011/T2-SISOP
 
-<!--
-INSTRUÇÕES DO MODELO (apaguem este bloco antes de entregar)
-- Este relatório é a entrega: exportem-no para PDF e CADA integrante envia o PDF no Moodle.
-- Nomes completos de todos os integrantes e o link do repositório público são obrigatórios
-  (linhas acima). Não coloquem matrícula, e-mail, telefone ou outro dado pessoal.
-- Mantenham EXATAMENTE os títulos numerados (## 0. ... ## 8.) e os campos em negrito.
-- Na seção 3, mantenham X1 a X5 e só as seções dos experimentos do escopo do grupo
-  (M1 = X6, M2 = X7, M3 = X8, M4 = X9, M5 = X10, M6 = X11, integração = X12, bônus = X13).
-  Apaguem as seções dos experimentos que o grupo não fez.
-- Substituam todo texto entre colchetes [ ... ] pelo conteúdo do grupo.
-- O campo **Veredito:** aceita só: CONFIRMADA, PARCIALMENTE CONFIRMADA ou REFUTADA.
-- Em **Evidências:**, citem arquivos que existam no repositório (resultados/..., graficos/...).
-- Antes de entregar, rodem:  python3 ferramentas/validar_entrega.py
--->
-
 ## 0. Resumo
 
-[Até 10 linhas: o que o grupo implementou, quais módulos escolheu e os 3 resultados mais importantes.]
+O trabalho implementou e avaliou o subsistema de E/S e o sistema de arquivos do SimES, incluindo SSTF, SCAN, polling, interrupção e as operações do sistema de arquivos. Foram desenvolvidos também os módulos M1 (cache de blocos), M3 (DMA e buffering) e M4 (links e compartilhamento), além da integração ponta a ponta obrigatória. Os experimentos mostraram que o desempenho das políticas depende fortemente do padrão de acesso e da carga. No X12, a cache LRU alcançou cerca de 90,4% de acertos na carga `compilador`, mas apenas cerca de 5% em `banco_dados`. No X8, o DMA manteve baixo e praticamente constante o custo de CPU conforme o tamanho das requisições aumentou. Os resultados também mostraram diferenças importantes entre FCFS, SSTF e SCAN e entre as políticas de cache e escrita.
 
 ## 1. Escopo realizado
 
@@ -30,12 +15,12 @@ INSTRUÇÕES DO MODELO (apaguem este bloco antes de entregar)
 | N1 · Dispositivo (fornecido) | usado | — |
 | N2 · Subsistema de E/S (SSTF, SCAN, polling, interrupção) | completo | Implementação concluída e testes aprovados. |
 | N3 · Sistema de arquivos | completo | Implementação concluída e testes aprovados. |
-| N4 · Experimentos X1–X5 e relatório | [completo / parcial] | [ ] |
+| N4 · Experimentos X1–X5 e relatório | completo | Experimentos executados, analisados e documentados no relatório. |
 | M1 · Cache de blocos | completo | Implementação concluída e testes aprovados. |
 | M3 · DMA e buffering | completo | Implementação concluída e testes aprovados. |
 | M4 · Links e compartilhamento | completo | Implementação concluída e testes aprovados. |
 | Integração (grupos de 4) | completo | Implementação concluída, teste aprovado e experimento X12 executado, analisado e com evidências geradas. |
-| [Bônus flash] | [completo / parcial / não feito] | [ ] |
+| Bônus flash | não feito | — |
 
 Resultado dos testes automáticos (`python3 executar.py testes`): Ran 29 tests in 0.035s — OK (skipped=4)
 

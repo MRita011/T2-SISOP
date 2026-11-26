@@ -159,19 +159,43 @@ Os quatro testes ignorados correspondem a M2, M5 e M6, que não fazem parte dos 
 
 ### X5 — Tabelas de arquivos abertos com vários processos
 
-**Hipótese:** [ ]
+**Hipótese:** A tabela global terá uma entrada por arquivo distinto aberto (no máximo as 12 páginas), enquanto cada processo terá no máximo 3 entradas (3 handles por trabalhador). A soma das tabelas por processo (8 × 3 = 24 aberturas) será maior que a tabela global, porque o sorteio de 3 entre 12 páginas faz vários processos abrirem a mesma página, e o contador de aberturas passará de 1. Esperamos ainda que o `open` custe 2 leituras (diretórios `/` e `/www`) e que o `close` não grave nada, pois a carga só lê.
 
-**Fundamentação:** [ ]
+**Fundamentação:** Silberschatz, seção 11.1.2: o SO mantém uma tabela de arquivos abertos por processo (posição, modo) e uma tabela global (cópia do FCB e contador de aberturas), cuja entrada é removida quando o contador zera. As regras de custo do `sistema.py` definem `open` = leitura dos diretórios do caminho, `read` = leitura dos blocos cobertos e `close` = escrita do diretório pai somente se o FCB estiver sujo.
 
-**Configuração:** [ ]
+**Configuração:** Carga `fs_servidor_web` (semente 2026): P0 cria `/www` e 12 páginas de 8 a 96 KiB; 8 trabalhadores (P1–P8) fazem 40 rodadas, e em cada uma abrem 3 páginas sorteadas, leem inteiras em blocos de 16 KiB e fecham. Alocação contígua, bloqueio consultivo, 6.279 operações, sem erros. Gerado por `python3 executar.py experimentos` (função `x5`).
 
-**Resultados:** [ ]
+**Resultados:**
 
-**Evidências:** [ ]
+| Indicador | Valor |
+|---|---|
+| Máximo da tabela global | 12 entradas |
+| Máximo da tabela por processo | 3 entradas |
+| Máximo da soma das tabelas por processo | 24 entradas |
+| Máximo do contador de aberturas | 6 |
+| Acessos ao disco (total) | 17.824 (2,84 por operação) |
+| Tempo total | 9.354,08 ms (1,49 ms por operação) |
 
-**Análise:** [ ]
+| Operação | Quantidade | Acessos médios | Tempo médio (ms) |
+|---|---|---|---|
+| open | 960 | 2,00 | 4,27 |
+| read | 4.346 | 3,65 | 1,18 |
+| close | 960 | 0,00 | 0,00 |
 
-**Veredito:** [ ]
+**Evidências:**
+- `resultados/arquivos.csv` (linha X5)
+- `resultados/arquivos_por_operacao.csv` (linhas X5)
+- `graficos/X5_tabelas.png`
+
+![X5 — tabelas de arquivos abertos](graficos/X5_tabelas.png)
+
+**Análise:** A tabela global guarda uma entrada por arquivo aberto, com um contador que soma as aberturas de todos os processos. A tabela por processo guarda uma entrada por abertura, com posição e modo, o que permite a cada processo ler no seu próprio ritmo. Com 24 aberturas simultâneas (8 × 3), a global chegou a no máximo 12 entradas, metade da soma das tabelas por processo (24): o compartilhamento evita duplicar o FCB de cada arquivo. O contador máximo de 6 mostra que, em algum momento, seis dos oito processos tinham a mesma página aberta. O `open` custa 2 acessos (diretórios `/` e `/www`, como manda a regra de custo) e 4,27 ms; esse valor é compatível com apenas um dos dois acessos pagar a latência rotacional de 4,17 ms, supondo que os blocos dos diretórios estão adjacentes. O `close` custa 0 porque a carga só lê e o FCB nunca fica sujo. No `read` (1,18 ms), as leituras seguintes de um mesmo arquivo são sequenciais e não pagam rotação; só a primeira leitura de cada abertura (cerca de 22% das leituras, 960 de 4.346) paga os 4,17 ms, o que é compatível com a média observada.
+
+Relação com sistemas reais: no Linux, cada processo tem uma tabela de descritores que aponta para uma `struct file` (com a posição) e esta para o inode compartilhado, uma estrutura em três níveis; no Windows, cada processo tem uma tabela de handles que aponta para objetos de arquivo. Em ambos o desempenho de abrir arquivos depende também do cache de diretórios (dentry cache no Linux).
+
+Limitações: o X5 roda sem cache de blocos, então todo `open` relê `/` e `/www` do disco (1.920 leituras de diretório), o que um SO real evitaria com o cache de diretórios. A carga é uma sequência simulada, sem concorrência real, e não há custo de travas nem limite de tamanho das tabelas.
+
+**Veredito:** CONFIRMADA
 
 ### X6 — Cache de blocos (M1)
 
@@ -189,21 +213,60 @@ Os quatro testes ignorados correspondem a M2, M5 e M6, que não fazem parte dos 
 
 **Veredito:** [ ]
 
-### X8 — DMA e buffering (M3)
+### X8 — DMA e buffering
 
-**Hipótese:** [ ]
+**Hipótese:** (a) O custo de CPU do DMA será constante e pequeno por requisição, independente do número de blocos, pois a CPU apenas programa a controladora e trata uma interrupção; a interrupção crescerá linearmente com o número de blocos (cópia de cada bloco pela CPU) e o polling ocupará a CPU durante todo o atendimento, sendo o mais caro. Com 1 bloco a interrupção será levemente mais barata que o DMA, e a partir de 2 blocos o DMA vence. O tempo de resposta será igual nos três modos, porque o modelo não acopla a CPU ao tempo do disco. (b) Com 1 buffer, produção e gravação se serializam; com 2 buffers elas se sobrepõem e o dispositivo (se for mais lento) vira o gargalo; um terceiro buffer trará ganho desprezível, pois os tempos são constantes.
 
-**Fundamentação:** [ ]
+**Fundamentação:** Silberschatz, seção 13.2.3 (DMA: a CPU programa a controladora e é avisada por uma única interrupção ao fim da transferência, em vez de uma por byte) e seção 13.4.2 (buffering: desacopla a velocidade do produtor da do dispositivo; o buffer duplo permite encher um buffer enquanto o outro é esvaziado). Custos do modelo (`parametros.py`): interrupção 0,015 ms, cópia 0,002 ms por bloco, programar o DMA 0,003 ms. Logo: DMA = 0,003 + 0,015 = 0,018 ms por requisição; interrupção = 0,015 + 0,002 × n ms por requisição.
 
-**Configuração:** [ ]
+**Configuração:** (1) CPU: carga aleatória em disco rígido, 1.000 requisições a cada 40 ms, FCFS, com 1, 8, 64 e 256 blocos por requisição, nos modos polling, interrupção e DMA. (2) Buffering: 500 blocos, produção de 2 ms, com 1, 2 e 3 buffers e consumo (gravação) de 0,5, 2 e 8 ms. Gerado por `python3 executar.py experimentos` (função `x8`).
 
-**Resultados:** [ ]
+**Resultados:**
 
-**Evidências:** [ ]
+CPU gasta com E/S (% do tempo total):
 
-**Análise:** [ ]
+| Blocos por requisição | Polling | Interrupção | DMA |
+|---|---|---|---|
+| 1 | 25,17 | 0,0423 | 0,0448 |
+| 8 | 25,87 | 0,3383 | 0,0448 |
+| 64 | 31,44 | 2,7059 | 0,0448 |
+| 256 | 50,52 | 10,8204 | 0,0448 |
 
-**Veredito:** [ ]
+Resposta média (ms), igual nos três modos: 12,30 (1 bloco), 12,71 (8), 16,16 (64) e 31,87 (256).
+
+Buffering (500 blocos, produção de 2 ms):
+
+| Consumo (ms) | Buffers | Tempo total (ms) | Bloqueio do produtor (ms) | Utilização do dispositivo (%) |
+|---|---|---|---|---|
+| 0,5 | 1 | 1.250,0 | 249,5 | 20,00 |
+| 0,5 | 2 | 1.000,5 | 0,0 | 24,99 |
+| 0,5 | 3 | 1.000,5 | 0,0 | 24,99 |
+| 2,0 | 1 | 2.000,0 | 998,0 | 50,00 |
+| 2,0 | 2 | 1.002,0 | 0,0 | 99,80 |
+| 2,0 | 3 | 1.002,0 | 0,0 | 99,80 |
+| 8,0 | 1 | 5.000,0 | 3.992,0 | 80,00 |
+| 8,0 | 2 | 4.002,0 | 2.988,0 | 99,95 |
+| 8,0 | 3 | 4.002,0 | 2.980,0 | 99,95 |
+
+**Evidências:**
+- `resultados/es.csv` (linhas X8)
+- `resultados/buffering.csv`
+- `graficos/X8_cpu.png`
+- `graficos/X8_buffering.png`
+
+![X8 — CPU gasta com E/S](graficos/X8_cpu.png)
+
+![X8 — buffering](graficos/X8_buffering.png)
+
+**Análise:** O custo do DMA ficou fixo em 0,0448% da CPU, o que equivale a 0,018 ms por requisição (1.000 × 0,018 ms ÷ cerca de 40.200 ms), qualquer que seja o tamanho da requisição. A interrupção cresce com o número de blocos porque a CPU copia cada um: de 0,0423% (1 bloco) a 10,82% (256 blocos), ou seja, cerca de 241 vezes o custo do DMA no maior tamanho. Com 1 bloco, a interrupção (0,017 ms) é um pouco mais barata que o DMA (0,018 ms); a partir de 2 blocos o DMA vence, como previsto. O polling gasta CPU durante todo o atendimento e por isso acompanha a ocupação do disco (cerca de 25% com 1 bloco, pois o atendimento leva cerca de 10 ms a cada 40 ms), chegando a 50,5% com 256 blocos. No gráfico `X8_cpu.png` o eixo vertical está em escala logarítmica, então a distância visual entre as barras subestima a diferença real. A resposta média é idêntica nos três modos, e isso é uma limitação do modelo: a CPU liberada pelo DMA não vira desempenho porque não há outro processo disputando a CPU.
+
+No buffering, com 1 buffer o produtor só começa o próximo bloco depois que o dispositivo termina o anterior, então tempo = blocos × (produção + consumo) = 500 × 10 = 5.000 ms (com consumo de 8 ms). Com 2 buffers, produção e gravação se sobrepõem: o tempo cai para 2 + 500 × 8 = 4.002 ms e o dispositivo satura (99,95%), passando a ser o gargalo; o produtor fica bloqueado 6 ms por bloco (8 − 2) em regime permanente (498 × 6 = 2.988 ms). Quando o dispositivo é mais rápido que o produtor (consumo de 0,5 ms), o bloqueio some com 2 buffers e quem limita é o produtor (utilização de apenas 24,99%). No gráfico `X8_buffering.png`, as curvas de 2 e 3 buffers coincidem: o terceiro buffer praticamente não altera o resultado (diferença de 8 ms no bloqueio, só no transitório inicial). Como produção e consumo têm tempo constante, dois buffers já absorvem tudo, e o buffer circular só compensaria variações de ritmo.
+
+Relação com sistemas reais: controladoras SATA (AHCI) e NVMe usam DMA com listas de descritores, e o driver recebe uma interrupção por comando concluído; o Linux também permite polling em dispositivos muito rápidos, onde o custo da interrupção passa a pesar. Buffers circulares aparecem em áudio e captura de vídeo, com filas de 3 ou mais buffers para absorver variações de tempo.
+
+Limitações: o DMA modelado não tem disputa de barramento (roubo de ciclos), custo de IOMMU nem coerência de cache; os tempos de produção e gravação são constantes, sem variação, e há um único produtor e um único dispositivo. A resposta é igual nos três modos por não haver processos competindo pela CPU.
+
+**Veredito:** CONFIRMADA
 
 ### X9 — Links e compartilhamento (M4)
 
